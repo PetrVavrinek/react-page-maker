@@ -11,6 +11,10 @@ class Palette extends Component {
    */
   _renderList = (props) => {
     const element = core.getRegisteredPaletteElements().find(e => e.type === props.type);
+
+    if(element && element.defaultProps)
+      props = { ...props, ...element.defaultProps };
+
     return element ? <element.component {...props} /> : null;
   }
 
