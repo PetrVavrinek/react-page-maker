@@ -10,9 +10,6 @@ import Preview from './components/Preview/Preview';
 import state from './core/state';
 import core from './core/core';
 
-// import basic style
-import './style.css';
-
 module.exports = {
   // all components
   Canvas,
