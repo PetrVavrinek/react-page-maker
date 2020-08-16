@@ -7,7 +7,7 @@ import Dropzone from '../Dropzone/Dropzone';
 // default initDone set to true
 const Canvas = props => (
   <div className="main-canvas">
-    <Dropzone {...props} parentID="root" id="root" initDone />
+    <Dropzone {...props} enableMotion={false} parentID="root" id="root" initDone />
   </div>
 );
 
