@@ -1,13 +1,49 @@
 import React, { Component } from 'react';
+import { Motion, spring } from 'react-motion';
 import PropTypes from 'prop-types';
 
 import core from '../../core/core';
+
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(value, max));
+};
 
 class Draggable extends Component {
   constructor(props) {
     super(props);
 
+    this.state = {
+      marginBefore: 0,
+      marginAfter: 0
+    }
+
     this.dragElemRef = React.createRef();
+
+    this.defaultMargin = {
+      marginTop: 0,
+      marginBottom: 0,
+      marginRight: 0,
+      marginLeft: 0
+    };
+  }
+
+  componentDidMount() {
+    if(this.dragElemRef.current) {
+      const style = this.dragElemRef.current.currentStyle || window.getComputedStyle(this.dragElemRef.current);
+      const toNum = (m) => {
+        m = m.replace("px", "");
+        return parseFloat(m);
+      }
+
+
+      this.defaultMargin = {
+        marginTop: toNum(style.marginTop),
+        marginBottom: toNum(style.marginBottom),
+        marginRight: toNum(style.marginRight),
+        marginLeft: toNum(style.marginLeft)
+      };
+    }
   }
 
   componentWillReceiveProps(nextProps) {
@@ -24,6 +60,8 @@ class Draggable extends Component {
 
     // done dragging, reset dragged element
     core.setDraggedElement(null);
+
+    this._resetMargin();
   }
 
   _dragStart = (e) => {
@@ -97,15 +135,29 @@ class Draggable extends Component {
       }
     } else {
       const dragElemY = e.clientY;
+      const elemHeight = e.target.getBoundingClientRect().height;
       if (dragElemY >= elemCord.y && dragElemY <= elemCord.y + elemCord.height) {
         const midY = elemCord.y + elemCord.height / 2;
         if (dragElemY < midY) {
           this.dragElemRef.current.classList.remove('after');
           this.dragElemRef.current.classList.add('before');
+
+
+          this.setState({
+            marginBefore: elemHeight,
+            marginAfter: this.getDefaultMotionStyle().marginAfter
+          });
+
           core.setDropPostion(this.props.index);
         } else {
           this.dragElemRef.current.classList.remove('before');
           this.dragElemRef.current.classList.add('after');
+
+          this.setState({
+            marginBefore: this.getDefaultMotionStyle().marginBefore,
+            marginAfter: elemHeight,
+          });
+
           core.setDropPostion(this.props.index + 1);
         }
       }
@@ -114,10 +166,24 @@ class Draggable extends Component {
     return true;
   }
 
-  _onDragLeave = () => {
+  _onDragLeave = (e) => {
     // remove before/after class from dragged element
     this.dragElemRef.current.classList.remove('before', 'after');
+
+    setTimeout(this._resetMargin, 250);
   }
+
+  _resetMargin = () => {
+    this.setState({ marginBefore: 0, marginAfter: 0 });
+  }
+
+  // default motion style (horizontal/vertical)
+  getDefaultMotionStyle = () =>  {
+    return {
+      marginBefore: this.allowHorizontal ? this.defaultMargin.marginLeft : this.defaultMargin.marginTop,
+      marginAfter: this.allowHorizontal ? this.defaultMargin.marginRight : this.defaultMargin.marginBottom
+    };
+  };
 
   render() {
     const { elementProps, draggable, allowHorizontal } = this.props;
@@ -138,19 +204,65 @@ class Draggable extends Component {
       };
     }
 
+    // calculated style (margin = height)
+    const getTargetMotionStyle = () => {
+      return { marginBefore: spring(this.state.marginBefore), marginAfter: spring(this.state.marginAfter)};
+    }
+
+
+    const getMotionStyle = style => {
+      let el_style = {};
+
+      const defBefore = this.getDefaultMotionStyle().marginBefore;
+      const before = Math.max(style.marginBefore, defBefore);
+
+      if(style.marginBefore) {
+        if(this.props.allowHorizontal)  el_style.marginLeft = before;
+        else                            el_style.marginTop = before;
+      }
+
+      const defAfter = this.getDefaultMotionStyle().marginAfter;
+      const after = Math.max(style.marginAfter, defAfter);
+
+      if(style.marginAfter)
+        if(this.props.allowHorizontal)  el_style.marginRight = after;
+        else                            el_style.marginBottom = after;
+
+      return el_style;
+    }
+
+    const getComponentContent = (style = null) => {
+        const props = style ? {style: getMotionStyle(style)} : {};
+        return (
+          <div
+            ref={this.dragElemRef}
+            className={`drag-item ${allowHorizontal ? 'inline' : ''}`}
+            onDragStart={this._dragStart}
+            onDragEnd={this._dragEnd}
+            {...elementProps}
+            {...e}
+            {...props}
+          >
+            {
+              this.props.children
+            }
+        </div>
+      );
+    }
+
+
     return (
-      <div
-        ref={this.dragElemRef}
-        className={`drag-item ${allowHorizontal ? 'inline' : ''}`}
-        onDragStart={this._dragStart}
-        onDragEnd={this._dragEnd}
-        {...elementProps}
-        {...e}
-      >
-        {
-          this.props.children
-        }
-      </div>
+
+      this.props.enableMotion ? (
+        <Motion defaultStyle={this.getDefaultMotionStyle()} style={getTargetMotionStyle()}>
+          {
+            motionStyle => {
+              return getComponentContent(motionStyle)
+            }
+          }
+        </Motion>
+      ) : getComponentContent()
+
     );
   }
 }
@@ -175,7 +287,8 @@ Draggable.propTypes = {
     PropTypes.element
   ]).isRequired,
   removeElement: PropTypes.func,
-  checkAndRemoveElement: PropTypes.func
+  checkAndRemoveElement: PropTypes.func,
+  enableMotion: PropTypes.bool
 };
 
 Draggable.defaultProps = {
@@ -183,7 +296,8 @@ Draggable.defaultProps = {
   elementProps: null,
   payload: null,
   draggable: true,
-  updateState: () => (true)
+  updateState: () => (true),
+  enableMotion: true
 };
 
 export default Draggable;
